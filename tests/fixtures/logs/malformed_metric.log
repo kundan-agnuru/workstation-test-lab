@@ -1,0 +1,6 @@
+META schema_version=1 run_id=11111111-1111-4111-8111-111111111111 package_execution_id=44444444-4444-4444-8444-444444444444 package=gpu machine_id=lab-001 execution_mode=simulated started_at=2026-10-12T12:00:00.000Z
+HOST os="Windows 11" cpu="Example CPU" gpu="Synthetic GPU" driver="580.00" application=""
+RESULT test_key=gpu.detect attempt=1 status=PASS duration_ms=2 timestamp=2026-10-12T12:00:00.002Z failure_category=- message="Detected"
+METRIC test_key=gpu.missing attempt=1 name=vram_total value=8192 unit=MiB iteration=1 direction=higher
+END result_count=1 ended_at=2026-10-12T12:00:00.004Z
+
