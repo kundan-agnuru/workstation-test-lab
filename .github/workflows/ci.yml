@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_DB: workstation_test
+          POSTGRES_USER: workstation
+          POSTGRES_PASSWORD: workstation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workstation -d workstation_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://workstation:workstation@127.0.0.1:5432/workstation_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.lock
+      - run: alembic upgrade head
+      - run: pytest --cov=runner --cov=parsers --cov=ingestion --cov=backend --cov=analysis
+      - run: ruff check .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+        working-directory: dashboard
+      - run: npm run build
+        working-directory: dashboard
+
