@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import func, select, text
+from sqlalchemy import String, cast, func, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from analysis.statistics import compare_to_baseline
@@ -154,7 +154,11 @@ def list_runs(
     if started_before:
         conditions.append(models.Run.started_at <= started_before)
     if package:
-        conditions.append(models.Run.selected_packages.contains([package]))
+        # JSON's generic ``contains`` comparator becomes a string LIKE query.
+        # PostgreSQL then tries to concatenate LIKE wildcards with JSONB and
+        # rejects the query. Casting to text gives both PostgreSQL and SQLite
+        # the same exact JSON-string membership check.
+        conditions.append(cast(models.Run.selected_packages, String).contains(f'"{package}"'))
     query = query.where(*conditions).order_by(models.Run.started_at.desc(), models.Run.id).offset(offset).limit(limit)
     count_query = count_query.where(*conditions)
     runs = db.scalars(query).all()

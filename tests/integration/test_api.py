@@ -95,6 +95,14 @@ def test_package_ingestion_is_idempotent_and_queryable(api) -> None:
     assert completed.status_code == 200, completed.text
     assert completed.json()["completeness"]["complete"] is True
 
+    matching_runs = client.get("/api/v1/runs?execution_mode=simulated&package=environment")
+    assert matching_runs.status_code == 200, matching_runs.text
+    assert matching_runs.json()["total"] == 1
+
+    nonmatching_runs = client.get("/api/v1/runs?execution_mode=simulated&package=gpu")
+    assert nonmatching_runs.status_code == 200, nonmatching_runs.text
+    assert nonmatching_runs.json()["total"] == 0
+
 
 def test_changed_content_conflicts(api) -> None:
     client, _ = api
