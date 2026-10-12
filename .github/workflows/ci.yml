@@ -22,16 +22,16 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://workstation:workstation@127.0.0.1:5432/workstation_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.lock
       - run: alembic upgrade head
-      - run: pytest --cov=runner --cov=parsers --cov=ingestion --cov=backend --cov=analysis
-      - run: ruff check .
-      - uses: actions/setup-node@v4
+      - run: python -m pytest --cov=runner --cov=parsers --cov=ingestion --cov=backend --cov=analysis
+      - run: python -m ruff check .
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: npm
