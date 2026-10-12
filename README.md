@@ -16,6 +16,23 @@ The project uses read-only probes. Missing optional hardware produces an explici
 
 ## Quick start (PowerShell)
 
+### Automated start with Codex
+
+Invoke the repository skill as `$fireup`, or open `/skills` and select `/fireUp`.
+It starts Docker Desktop when needed, builds the complete stack, waits for its health
+checks, and returns the ready URLs. If a new Docker installation requires a Windows
+restart, it temporarily uses the installed project-local Python and Node toolchains.
+The same launcher can be run directly:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\.codex\skills\fireup\scripts\fire-up.ps1
+```
+
+The dashboard is available at `http://localhost:5173`, and API documentation is at
+`http://127.0.0.1:8000/docs`. Repeated calls reuse the running services and database.
+
+### Manual development setup
+
 ```powershell
 Copy-Item .env.example .env
 python -m venv .venv

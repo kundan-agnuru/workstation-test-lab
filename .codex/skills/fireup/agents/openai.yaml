@@ -1,0 +1,7 @@
+interface:
+  display_name: "/fireUp"
+  short_description: "Start the local stack and return its dashboard URL"
+  default_prompt: "Use $fireup to start Workstation Test Lab locally and report the ready dashboard and API URLs."
+
+policy:
+  allow_implicit_invocation: true
