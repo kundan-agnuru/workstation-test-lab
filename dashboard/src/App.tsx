@@ -26,6 +26,7 @@ function Empty({ children }: { children: string }) {
 export default function App() {
   const [filters, setFilters] = useState(initialFilters);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [laneSummary, setLaneSummary] = useState<Summary | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
   const [results, setResults] = useState<TestResult[]>([]);
@@ -39,10 +40,12 @@ export default function App() {
     let active = true;
     setLoading(true);
     setError("");
-    Promise.all([api.summary(filters), api.runs(filters)])
-      .then(([summaryData, runData]) => {
+    const allLaneFilters: Filters = { ...filters, package: "" };
+    Promise.all([api.summary(filters), api.summary(allLaneFilters), api.runs(filters)])
+      .then(([summaryData, laneSummaryData, runData]) => {
         if (!active) return;
         setSummary(summaryData);
+        setLaneSummary(laneSummaryData);
         setRuns(runData.items);
       })
       .catch((reason: Error) => active && setError(reason.message))
@@ -116,7 +119,7 @@ export default function App() {
         <div className="section-heading"><div><p className="eyebrow">PACKAGE HEALTH</p><h2>Four independent test lanes</h2></div></div>
         <div className="package-grid">
           {packages.map((name) => {
-            const counts = summary?.package_counts[name];
+            const counts = laneSummary?.package_counts[name];
             return <button key={name} className={`package-card ${filters.package === name ? "selected" : ""}`} onClick={() => update("package", filters.package === name ? "" : name)}>
               <div><span className="package-index">0{packages.indexOf(name) + 1}</span><h3>{name}</h3></div>
               <div className="status-row">{statuses.map((status) => <span key={status} title={status}><i className={`dot status-${status.toLowerCase()}`} />{counts?.[status] ?? 0}</span>)}</div>
