@@ -22,8 +22,12 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://workstation:workstation@postgres:5432/workstation_lab
       DASHBOARD_ORIGIN: http://localhost:5173
+      RERUN_ARTIFACTS_ROOT: /app/artifacts/reruns
+      WORKSTATION_MACHINE_ID: docker-api-runtime
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ./artifacts/reruns:/app/artifacts/reruns
     depends_on:
       postgres:
         condition: service_healthy

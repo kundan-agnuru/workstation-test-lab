@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app import models
 from backend.app.db import Base, get_db
-from backend.app.main import app
+from backend.app.main import app, settings
 
 
 @pytest.fixture()
@@ -113,6 +113,25 @@ def test_changed_content_conflicts(api) -> None:
     changed = {**original, "file_hash": hashlib.sha256(raw).hexdigest(), "raw_log_base64": base64.b64encode(raw).decode()}
     response = client.post("/api/v1/package-results", json=changed)
     assert response.status_code == 409
+
+
+def test_rerun_executes_logs_and_ingests_results(api, tmp_path, monkeypatch) -> None:
+    client, _ = api
+    monkeypatch.setattr(settings, "rerun_artifacts_root", tmp_path)
+
+    response = client.post("/api/v1/reruns/environment?execution_mode=simulated")
+
+    assert response.status_code == 201, response.text
+    run = response.json()
+    assert run["status"] == "COMPLETED"
+    assert run["execution_mode"] == "simulated"
+    assert run["selected_packages"] == ["environment"]
+    assert run["completeness"]["complete"] is True
+    assert len(list(tmp_path.glob("*/*/environment.log"))) == 1
+
+    results = client.get(f"/api/v1/runs/{run['run_id']}/results")
+    assert results.status_code == 200
+    assert results.json()["total"] == 4
 
 
 def test_invalid_artifact_rolls_back_entire_package(api) -> None:

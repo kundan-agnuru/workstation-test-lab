@@ -17,7 +17,15 @@ from analysis.statistics import compare_to_baseline
 from backend.app import models
 from backend.app.config import get_settings
 from backend.app.db import get_db
-from backend.app.schemas import BaselineCreate, PackageIngestion, RunCreate, RunPatch
+from backend.app.reruns import execute_package_rerun
+from backend.app.schemas import (
+    BaselineCreate,
+    ExecutionMode,
+    PackageIngestion,
+    PackageName,
+    RunCreate,
+    RunPatch,
+)
 from backend.app.services import create_or_get_run, ingest_package, package_names_for_run
 
 settings = get_settings()
@@ -126,6 +134,21 @@ def post_package(payload: PackageIngestion, db: Db):
         "file_hash": package.file_hash,
         "duplicate": duplicate,
     }
+
+
+@app.post("/api/v1/reruns/{package}", status_code=201)
+def rerun_package(package: PackageName, db: Db, execution_mode: ExecutionMode = "real"):
+    try:
+        run = execute_package_rerun(
+            db,
+            package,
+            execution_mode,
+            settings.rerun_artifacts_root,
+            settings.max_ingestion_bytes,
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"rerun failed: {exc}") from exc
+    return _run_dict(run, package_names_for_run(db, run.id))
 
 
 @app.get("/api/v1/runs")

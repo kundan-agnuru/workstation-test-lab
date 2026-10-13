@@ -11,6 +11,7 @@ deterministic ordering, and return `{items, total, limit, offset}`.
 | `POST /api/v1/runs` | Register a run and immutable environment snapshot |
 | `PATCH /api/v1/runs/{run_id}` | Complete or abort a run |
 | `POST /api/v1/package-results` | Atomically ingest a parsed package and raw log |
+| `POST /api/v1/reruns/{package}` | Execute, log, ingest, and complete one package rerun |
 | `GET /api/v1/runs` | Filtered run list |
 | `GET /api/v1/runs/{run_id}` | Run summary and package completeness |
 | `GET /api/v1/runs/{run_id}/results` | Filtered results for one run |
@@ -27,4 +28,10 @@ HTTP 409. Requests larger than `MAX_INGESTION_BYTES` return HTTP 413.
 The dashboard computes pass rate as `PASS / (PASS + FAIL + ERROR)`. `SKIP` and no
 results are displayed separately. Real and simulated data are never combined unless
 the caller explicitly requests both modes.
+
+The rerun endpoint accepts `execution_mode=real|simulated`. It creates a new run,
+executes only the requested package, writes and parses the immutable log, ingests
+the package transactionally, and marks the run complete before responding. When the
+API runs in Docker, real-mode reruns measure the API container runtime. Logs persist
+under `RERUN_ARTIFACTS_ROOT` and raw log bytes are also retained in PostgreSQL.
 

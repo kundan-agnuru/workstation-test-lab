@@ -65,7 +65,7 @@ class IngestionClient:
             raise RuntimeError(f"missing or invalid run manifest {path}: {exc}") from exc
 
     @staticmethod
-    def _package_payload(package: ParsedPackage) -> dict[str, object]:
+    def package_payload(package: ParsedPackage) -> dict[str, object]:
         return {
             "run_id": package.run_id,
             "package_execution_id": package.package_execution_id,
@@ -134,7 +134,7 @@ class IngestionClient:
             return "already_acknowledged"
         manifest = self._manifest(package)
         self._register(package, manifest)
-        response = self._request("POST", "/api/v1/package-results", json=self._package_payload(package))
+        response = self._request("POST", "/api/v1/package-results", json=self.package_payload(package))
         if response.status_code not in {200, 201}:
             raise RuntimeError(f"package ingestion rejected ({response.status_code}): {response.text}")
         acknowledged[package.package_execution_id] = package.file_hash

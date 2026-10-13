@@ -1,4 +1,4 @@
-import type { Filters, ResultDetail, Run, Summary, TestResult, TrendResponse } from "./types";
+import type { Filters, Mode, PackageName, ResultDetail, Run, Summary, TestResult, TrendResponse } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -11,8 +11,8 @@ function params(input: Record<string, string | number | undefined>): string {
   return query ? `?${query}` : "";
 }
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, init);
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(typeof body.detail === "string" ? body.detail : `API returned ${response.status}`);
@@ -42,6 +42,8 @@ export const api = {
       `/api/v1/runs/${id}/results${params({ package: filters.package, status: filters.status, test_key: filters.test_key, limit: 100, offset })}`,
     ),
   result: (id: number) => request<ResultDetail>(`/api/v1/results/${id}`),
+  rerun: (packageName: PackageName, executionMode: Exclude<Mode, "all">) =>
+    request<Run>(`/api/v1/reruns/${packageName}${params({ execution_mode: executionMode })}`, { method: "POST" }),
   trends: (testKey: string, metricName: string, mode: string, machine: string) =>
     request<TrendResponse>(
       `/api/v1/metrics/trends${params({ test_key: testKey, metric_name: metricName, execution_mode: mode, machine })}`,

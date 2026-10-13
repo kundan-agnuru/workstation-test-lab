@@ -34,6 +34,9 @@ export default function App() {
   const [trendData, setTrendData] = useState<TrendResponse>({ items: [], baseline: null, comparison: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rerunning, setRerunning] = useState<PackageName | null>(null);
+  const [rerunNotice, setRerunNotice] = useState("");
+  const [refreshToken, setRefreshToken] = useState(0);
 
   const filterKey = JSON.stringify(filters);
   useEffect(() => {
@@ -53,7 +56,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [filterKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filterKey, refreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedRun) return;
@@ -77,6 +80,25 @@ export default function App() {
   }, [filters.execution_mode, filters.machine]);
 
   const update = (name: keyof Filters, value: string) => setFilters((current) => ({ ...current, [name]: value }));
+  const rerunPackage = async (packageName: PackageName) => {
+    const executionMode = filters.execution_mode === "simulated" ? "simulated" : "real";
+    setRerunning(packageName);
+    setRerunNotice("");
+    setError("");
+    try {
+      const run = await api.rerun(packageName, executionMode);
+      setSelectedRun(run);
+      setSelectedResult(null);
+      setResults([]);
+      setFilters({ ...initialFilters, execution_mode: executionMode, package: packageName });
+      setRefreshToken((current) => current + 1);
+      setRerunNotice(`${packageName} rerun completed, ingested, and loaded.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Rerun failed");
+    } finally {
+      setRerunning(null);
+    }
+  };
   const passRate = summary?.pass_rate == null ? "—" : `${(summary.pass_rate * 100).toFixed(1)}%`;
   const chartData = useMemo(
     () => trendData.items.map((item) => ({ ...item, label: new Date(item.timestamp).toLocaleString() })),
@@ -106,7 +128,8 @@ export default function App() {
 
       {filters.execution_mode === "simulated" && <div className="simulation-banner">SIMULATION DATA — synthetic hardware values</div>}
       {filters.execution_mode === "all" && <div className="simulation-banner">MIXED MODES — rows retain their individual mode labels</div>}
-      {error && <div className="error" role="alert"><strong>API unavailable</strong><span>{error}</span></div>}
+      {rerunNotice && <div className="rerun-notice" role="status">{rerunNotice}</div>}
+      {error && <div className="error" role="alert"><strong>Request failed</strong><span>{error}</span></div>}
 
       <section className="metrics" aria-label="Overview">
         <article><span>Pass rate</span><strong>{passRate}</strong><small>PASS / evaluated</small></article>
@@ -120,10 +143,15 @@ export default function App() {
         <div className="package-grid">
           {packages.map((name) => {
             const counts = laneSummary?.package_counts[name];
-            return <button key={name} className={`package-card ${filters.package === name ? "selected" : ""}`} onClick={() => update("package", filters.package === name ? "" : name)}>
-              <div><span className="package-index">0{packages.indexOf(name) + 1}</span><h3>{name}</h3></div>
-              <div className="status-row">{statuses.map((status) => <span key={status} title={status}><i className={`dot status-${status.toLowerCase()}`} />{counts?.[status] ?? 0}</span>)}</div>
-            </button>;
+            return <article key={name} className={`package-card ${filters.package === name ? "selected" : ""}`}>
+              <button type="button" className="package-select" aria-pressed={filters.package === name} onClick={() => update("package", filters.package === name ? "" : name)}>
+                <div className="package-heading"><span className="package-index">0{packages.indexOf(name) + 1}</span><h3>{name}</h3></div>
+                <div className="status-row">{statuses.map((status) => <span key={status} title={status}><i className={`dot status-${status.toLowerCase()}`} />{counts?.[status] ?? 0}</span>)}</div>
+              </button>
+              <button type="button" className="rerun-button" disabled={rerunning !== null} onClick={() => void rerunPackage(name)}>
+                {rerunning === name ? "Running…" : "Re-run"}
+              </button>
+            </article>;
           })}
         </div>
       </section>
