@@ -83,6 +83,37 @@ function Test-PendingWindowsRestart {
     )
 }
 
+function Stop-ProcessTree {
+    param([Parameter(Mandatory)][int]$ProcessId)
+
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue
+    foreach ($child in $children) {
+        Stop-ProcessTree -ProcessId $child.ProcessId
+    }
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+function Stop-ProjectNativeStack {
+    $runDirectory = Join-Path $repositoryRoot "artifacts\fireup"
+    foreach ($pidFile in @("api.pid", "dashboard.pid")) {
+        $pidPath = Join-Path $runDirectory $pidFile
+        if (-not (Test-Path -LiteralPath $pidPath)) {
+            continue
+        }
+
+        $storedPid = [int](Get-Content -LiteralPath $pidPath)
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $storedPid" -ErrorAction SilentlyContinue
+        $ownedByProject = $process -and (
+            $process.ExecutablePath -like "$repositoryRoot*" -or
+            $process.CommandLine -like "*$repositoryRoot*"
+        )
+        if ($ownedByProject) {
+            Stop-ProcessTree -ProcessId $storedPid
+        }
+        Remove-Item -LiteralPath $pidPath -Force
+    }
+}
+
 function Start-NativeStack {
     $python = Join-Path $repositoryRoot ".venv\python.exe"
     $alembic = Join-Path $repositoryRoot ".venv\Scripts\alembic.exe"
@@ -143,21 +174,32 @@ function Start-NativeStack {
 
 $dockerCommand = Get-Command docker -ErrorAction SilentlyContinue
 if ($dockerCommand -and (Test-DockerEngine)) {
-    # The engine is already ready.
-}
-elseif (Test-PendingWindowsRestart) {
-    $nativeMode = $true
+    Stop-ProjectNativeStack
 }
 elseif (-not $dockerCommand) {
-    throw "Docker is not installed. Install Docker Desktop, then run `$fireup again."
+    if (Test-PendingWindowsRestart) {
+        $nativeMode = $true
+    }
+    else {
+        throw "Docker is not installed. Install Docker Desktop, then run `$fireup again."
+    }
 }
 elseif (-not (Test-Path -LiteralPath $dockerDesktop)) {
     throw "Docker Desktop is installed incompletely or cannot be found at '$dockerDesktop'."
 }
 else {
+    Stop-ProjectNativeStack
     Write-Host "Starting Docker Desktop..."
     Start-Process -FilePath $dockerDesktop -WindowStyle Hidden
-    Wait-ForCondition -Description "the Docker engine" -TimeoutSeconds $StartupTimeoutSeconds -Condition { Test-DockerEngine }
+    try {
+        Wait-ForCondition -Description "the Docker engine" -TimeoutSeconds $StartupTimeoutSeconds -Condition { Test-DockerEngine }
+    }
+    catch {
+        if (-not (Test-PendingWindowsRestart)) {
+            throw
+        }
+        $nativeMode = $true
+    }
 }
 
 Push-Location $repositoryRoot
