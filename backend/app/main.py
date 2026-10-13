@@ -17,7 +17,7 @@ from analysis.statistics import compare_to_baseline
 from backend.app import models
 from backend.app.config import get_settings
 from backend.app.db import get_db
-from backend.app.reruns import execute_package_rerun
+from backend.app.reruns import execute_all_packages_rerun, execute_package_rerun
 from backend.app.schemas import (
     BaselineCreate,
     ExecutionMode,
@@ -148,6 +148,20 @@ def rerun_package(package: PackageName, db: Db, execution_mode: ExecutionMode = 
         )
     except Exception as exc:
         raise HTTPException(500, f"rerun failed: {exc}") from exc
+    return _run_dict(run, package_names_for_run(db, run.id))
+
+
+@app.post("/api/v1/reruns", status_code=201)
+def rerun_all_packages(db: Db, execution_mode: ExecutionMode = "real"):
+    try:
+        run = execute_all_packages_rerun(
+            db,
+            execution_mode,
+            settings.rerun_artifacts_root,
+            settings.max_ingestion_bytes,
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"run all failed: {exc}") from exc
     return _run_dict(run, package_names_for_run(db, run.id))
 
 

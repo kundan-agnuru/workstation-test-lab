@@ -12,6 +12,7 @@ deterministic ordering, and return `{items, total, limit, offset}`.
 | `PATCH /api/v1/runs/{run_id}` | Complete or abort a run |
 | `POST /api/v1/package-results` | Atomically ingest a parsed package and raw log |
 | `POST /api/v1/reruns/{package}` | Execute, log, ingest, and complete one package rerun |
+| `POST /api/v1/reruns` | Execute, log, ingest, and complete all four packages in one run |
 | `GET /api/v1/runs` | Filtered run list |
 | `GET /api/v1/runs/{run_id}` | Run summary and package completeness |
 | `GET /api/v1/runs/{run_id}/results` | Filtered results for one run |
@@ -34,4 +35,6 @@ executes only the requested package, writes and parses the immutable log, ingest
 the package transactionally, and marks the run complete before responding. When the
 API runs in Docker, real-mode reruns measure the API container runtime. Logs persist
 under `RERUN_ARTIFACTS_ROOT` and raw log bytes are also retained in PostgreSQL.
+Calling the collection endpoint follows the same flow for all four packages and
+returns only after the complete run is available to query.
 

@@ -34,7 +34,7 @@ export default function App() {
   const [trendData, setTrendData] = useState<TrendResponse>({ items: [], baseline: null, comparison: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [rerunning, setRerunning] = useState<PackageName | null>(null);
+  const [rerunning, setRerunning] = useState<PackageName | "all" | null>(null);
   const [rerunNotice, setRerunNotice] = useState("");
   const [refreshToken, setRefreshToken] = useState(0);
 
@@ -99,6 +99,25 @@ export default function App() {
       setRerunning(null);
     }
   };
+  const rerunAll = async () => {
+    const executionMode = filters.execution_mode === "simulated" ? "simulated" : "real";
+    setRerunning("all");
+    setRerunNotice("");
+    setError("");
+    try {
+      const run = await api.rerunAll(executionMode);
+      setSelectedRun(run);
+      setSelectedResult(null);
+      setResults([]);
+      setFilters({ ...initialFilters, execution_mode: executionMode });
+      setRefreshToken((current) => current + 1);
+      setRerunNotice("All four test lanes completed, ingested, and loaded.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Run all failed");
+    } finally {
+      setRerunning(null);
+    }
+  };
   const passRate = summary?.pass_rate == null ? "—" : `${(summary.pass_rate * 100).toFixed(1)}%`;
   const chartData = useMemo(
     () => trendData.items.map((item) => ({ ...item, label: new Date(item.timestamp).toLocaleString() })),
@@ -113,7 +132,12 @@ export default function App() {
           <h1>Workstation Test Lab</h1>
           <p className="subtitle">Trace every probe from immutable package logs to comparable measurements.</p>
         </div>
-        <div className="live"><span /> API DATA</div>
+        <div className="hero-actions">
+          <button type="button" className="run-all-button" disabled={rerunning !== null} onClick={() => void rerunAll()}>
+            {rerunning === "all" ? "Running all…" : "Run All"}
+          </button>
+          <div className="live"><span /> API DATA</div>
+        </div>
       </header>
 
       <section className="filter-panel" aria-label="Result filters">

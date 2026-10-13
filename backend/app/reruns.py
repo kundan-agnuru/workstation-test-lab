@@ -23,7 +23,7 @@ def _write_manifest(
     run_id: str,
     host_id: str,
     execution_mode: str,
-    package: Package,
+    packages: list[Package],
     inventory: dict[str, object],
     started_at: datetime,
 ) -> None:
@@ -31,7 +31,7 @@ def _write_manifest(
         "run_id": run_id,
         "machine_id": host_id,
         "execution_mode": execution_mode,
-        "selected_packages": [package.value],
+        "selected_packages": [package.value for package in packages],
         "started_at": started_at.isoformat(),
         "inventory": inventory,
     }
@@ -40,63 +40,65 @@ def _write_manifest(
     temporary.replace(run_directory / "run.json")
 
 
-def execute_package_rerun(
+def execute_packages_rerun(
     session: Session,
-    package_name: str,
+    packages: list[Package],
     execution_mode: str,
     artifacts_root: Path,
     max_ingestion_bytes: int,
 ) -> models.Run:
-    package = Package(package_name)
+    if not packages:
+        raise ValueError("at least one package is required")
     run_id = str(uuid.uuid4())
-    package_execution_id = str(uuid.uuid4())
     started_at = datetime.now(UTC)
     artifacts_root = artifacts_root.resolve()
     run_directory = artifacts_root / run_id
-    execution_directory = run_directory / package_execution_id
     run_directory.mkdir(parents=True, exist_ok=False)
 
     host_id = machine_id()
     inventory = collect_inventory(artifacts_root)
-    _write_manifest(run_directory, run_id, host_id, execution_mode, package, inventory, started_at)
+    _write_manifest(run_directory, run_id, host_id, execution_mode, packages, inventory, started_at)
     run, _ = create_or_get_run(
         session,
         RunCreate(
             run_id=run_id,
             machine_id=host_id,
             execution_mode=execution_mode,
-            selected_packages=[package.value],
+            selected_packages=[package.value for package in packages],
             environment_snapshot=inventory,
             started_at=started_at,
         ),
     )
 
     try:
-        execution_directory.mkdir(parents=True, exist_ok=False)
-        outcome = PACKAGE_RUNNERS[package](
-            execution_directory,
-            execution_mode,
-            require_gpu=False,
-            expected_driver=None,
-            repeats=3,
-        )
-        log_path = write_package_log(
-            execution_directory,
-            run_id,
-            package_execution_id,
-            package,
-            host_id,
-            execution_mode,
-            inventory,
-            started_at,
-            outcome,
-        )
-        parsed = parse_log(log_path, expected_package=package.value)
-        ingest_package(
-            session,
-            PackageIngestion.model_validate(IngestionClient.package_payload(parsed)),
-            max_ingestion_bytes,
-        )
+        for package in packages:
+            package_execution_id = str(uuid.uuid4())
+            execution_directory = run_directory / package_execution_id
+            execution_directory.mkdir(parents=True, exist_ok=False)
+            outcome = PACKAGE_RUNNERS[package](
+                execution_directory,
+                execution_mode,
+                require_gpu=False,
+                expected_driver=None,
+                repeats=3,
+            )
+            log_path = write_package_log(
+                execution_directory,
+                run_id,
+                package_execution_id,
+                package,
+                host_id,
+                execution_mode,
+                inventory,
+                started_at,
+                outcome,
+            )
+            parsed = parse_log(log_path, expected_package=package.value)
+            ingest_package(
+                session,
+                PackageIngestion.model_validate(IngestionClient.package_payload(parsed)),
+                max_ingestion_bytes,
+            )
         run = session.get(models.Run, run_id)
         assert run is not None
         run.status = "COMPLETED"
@@ -112,3 +114,34 @@ def execute_package_rerun(
             failed_run.ended_at = datetime.now(UTC)
             session.commit()
         raise
+
+
+def execute_package_rerun(
+    session: Session,
+    package_name: str,
+    execution_mode: str,
+    artifacts_root: Path,
+    max_ingestion_bytes: int,
+) -> models.Run:
+    return execute_packages_rerun(
+        session,
+        [Package(package_name)],
+        execution_mode,
+        artifacts_root,
+        max_ingestion_bytes,
+    )
+
+
+def execute_all_packages_rerun(
+    session: Session,
+    execution_mode: str,
+    artifacts_root: Path,
+    max_ingestion_bytes: int,
+) -> models.Run:
+    return execute_packages_rerun(
+        session,
+        list(Package),
+        execution_mode,
+        artifacts_root,
+        max_ingestion_bytes,
+    )

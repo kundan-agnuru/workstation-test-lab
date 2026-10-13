@@ -44,6 +44,8 @@ export const api = {
   result: (id: number) => request<ResultDetail>(`/api/v1/results/${id}`),
   rerun: (packageName: PackageName, executionMode: Exclude<Mode, "all">) =>
     request<Run>(`/api/v1/reruns/${packageName}${params({ execution_mode: executionMode })}`, { method: "POST" }),
+  rerunAll: (executionMode: Exclude<Mode, "all">) =>
+    request<Run>(`/api/v1/reruns${params({ execution_mode: executionMode })}`, { method: "POST" }),
   trends: (testKey: string, metricName: string, mode: string, machine: string) =>
     request<TrendResponse>(
       `/api/v1/metrics/trends${params({ test_key: testKey, metric_name: metricName, execution_mode: mode, machine })}`,

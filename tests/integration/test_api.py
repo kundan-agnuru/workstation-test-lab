@@ -134,6 +134,30 @@ def test_rerun_executes_logs_and_ingests_results(api, tmp_path, monkeypatch) -> 
     assert results.json()["total"] == 4
 
 
+def test_run_all_executes_logs_and_ingests_every_package(api, tmp_path, monkeypatch) -> None:
+    client, _ = api
+    monkeypatch.setattr(settings, "rerun_artifacts_root", tmp_path)
+
+    response = client.post("/api/v1/reruns?execution_mode=simulated")
+
+    assert response.status_code == 201, response.text
+    run = response.json()
+    assert run["status"] == "COMPLETED"
+    assert run["execution_mode"] == "simulated"
+    assert run["selected_packages"] == ["environment", "driver", "gpu", "cpu"]
+    assert run["completeness"]["complete"] is True
+    assert len(list(tmp_path.glob("*/*/*.log"))) == 4
+
+    results = client.get(f"/api/v1/runs/{run['run_id']}/results")
+    assert results.status_code == 200
+    assert {item["package"] for item in results.json()["items"]} == {
+        "environment",
+        "driver",
+        "gpu",
+        "cpu",
+    }
+
+
 def test_invalid_artifact_rolls_back_entire_package(api) -> None:
     client, factory = api
     register(client)
